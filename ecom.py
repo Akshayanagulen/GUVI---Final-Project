@@ -18,6 +18,10 @@ from sklearn.metrics import (
     ConfusionMatrixDisplay,
 )
 import numpy as np
+from sklearn.tree import DecisionTreeClassifier, plot_tree
+from sklearn.metrics import accuracy_score, confusion_matrix, classification_report
+from sklearn.model_selection import train_test_split
+import pandas as pd
 
 # Function to load data
 def load_data():
@@ -28,11 +32,20 @@ data=load_data()
 df=pd.DataFrame(data)
 data_set = df[df.duplicated()]
 df1 = df.drop_duplicates().reset_index(drop=True)
+columns_to_remove = ['totals_newVisits','device_isMobile','geoNetwork_latitude', 'geoNetwork_longitude','youtube','sessionQualityDim', 'last_visitId',
+       'latest_visit_id', 'visitId_threshold', 'earliest_visit_id',
+       'earliest_visit_number', 'latest_visit_number', 'time_earliest_visit',
+       'time_latest_visit', 'days_since_last_visit',
+       'days_since_first_visit','earliest_source', 'latest_source', 'earliest_medium', 'latest_medium',
+       'earliest_keyword', 'latest_keyword', 'earliest_isTrueDirect',
+       'latest_isTrueDirect','products_array', 'target_date']
+
+df1 = df1.drop(columns_to_remove, axis=1)
 
 
 # Streamlit App
 # Create tabs in the sidebar
-selected_tab = st.sidebar.radio("Navigation", ["Home", "EDA Analysis", "Model UI","Linear Regression","Logistic Regression model","Random Forest Classifier"])
+selected_tab = st.sidebar.radio("Navigation", ["Home", "EDA Analysis", "Model UI","Logistic Regression model","Random Forest Classifier","Decision Tree Classifier"])
 
 # Define the content for each tab
 if selected_tab == "Home":
@@ -120,161 +133,184 @@ elif selected_tab == "Model UI":
     st.write(f'Total number of conversions: {num_conversions}')
     st.write(f'Total number of non-conversion: {no_converted}')
 
-elif selected_tab == "Linear Regression":
-    st.header("Model Building using Machiece Learning : Classification Algorithms")
-     # Allow users to select X and y variables
-    selected_variable_X = st.selectbox("Select X Variable", df1.columns)
-    selected_variable_y = st.selectbox("Select y Variable", df1.columns)
-    st.header("1. Linear Regression")
-
-    X = df1[[selected_variable_X]]
-    # Target variable
-    y = df1[selected_variable_y]
-
-    # Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
-
-    linear_model = LinearRegression()
-    linear_model.fit(X_train, y_train)
-
-    # Make predictions on the test set
-    y_pred = linear_model.predict(X_test)
-
-    # Display the prediction
-    st.subheader('Prediction')
-    st.write(f"Predicted has_converted value: {y_pred[0]:.2f}")
-
-    # Evaluate the model on the test set
-    y_pred = linear_model.predict(X_test)
-    # Evaluate the model
-    mse = mean_squared_error(y_test, y_pred)
-    r2 = r2_score(y_test, y_pred)
-
-    # Display model evaluation metrics
-    st.subheader('Model Evaluation')
-    st.write(f"Mean Squared Error: {mse:.2f}")
-    st.write(f"R-squared Score: {r2:.2f}")
-    # Scatter plot with regression line
-    plt.figure(figsize=(8, 6))
-
-    # Scatter plot
-    plt.scatter(X_test, y_test, color='blue', label='Actual values')
-
-    # Regression line
-    x_range = np.linspace(X_test.min(), X_test.max(), 100)
-    y_range = linear_model.predict(x_range.reshape(-1, 1))
-    plt.plot(x_range, y_range, color='red', linewidth=2, label='Regression line')
-
-    plt.title(f"Scatter Plot with Regression Line ({selected_variable_X} vs {selected_variable_y})")
-    plt.xlabel(selected_variable_X)
-    plt.ylabel(selected_variable_y)
-    plt.legend()
-
-    # Display the plot in Streamlit
-    st.pyplot(plt)
     
 elif selected_tab == "Logistic Regression model":
     
     st.header("Logistic Regression model")
-    selected_variable_1 = st.selectbox("Select X Variable", df1.columns)
-    selected_variable_2 = st.selectbox("Select y Variable", df1.columns)
-    
-    X = df1[[selected_variable_1]]
+    st.subheader("Logistic regression model using Count session, Treansaction revenue to check whether converted")
+    # Function to plot logistic regression line
+    def plot_logistic_regression_line(X, model, ax):
+        # Extract coefficients and intercept from the model
+        coef = model.coef_
+        intercept = model.intercept_
+        # Define x values for the line
+        x_values = np.linspace(X.iloc[:, 0].min(), X.iloc[:, 0].max(), 100)
+        # Calculate y values using logistic regression equation (y = mx + b)
+        y_values = (-intercept - coef[0][0] * x_values) / coef[0][1]
+        # Plot the line
+        ax.plot(x_values, y_values, color='red', linewidth=2)
+
+    # Assuming you have a DataFrame named 'df1' with features and target variable
+    # Replace 'transactionRevenue' and 'count_session' with your actual column names
+    # Replace 'has_converted' with your target variable column name
+
+    # Features
+    X = df1[['transactionRevenue', 'count_session']]
+
     # Target variable
-    y = df1[selected_variable_2]
+    y = df1['has_converted']
+
     # Split the data into training and testing sets
-    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.5, random_state=42)
 
     # Create and train the Logistic Regression model
     logistic_model = LogisticRegression()
     logistic_model.fit(X_train, y_train)
 
     # Make predictions on the test set
-    y_pred1 = logistic_model.predict(X_test)
+    y_pred = logistic_model.predict(X_test)
 
     # Evaluate the model
-    precision = precision_score(y_test, y_pred1, average='weighted')
-    recall = recall_score(y_test, y_pred1, average='weighted')
-    accuracy = accuracy_score(y_test, y_pred1)
-    f1 = f1_score(y_test, y_pred1, average='weighted')
-    conf_matrix = confusion_matrix(y_test, y_pred1)
+    accuracy = accuracy_score(y_test, y_pred)
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    classification_rep = classification_report(y_test, y_pred, output_dict=True)
+    # Convert the classification report to a DataFrame
+    df_classification_rep = pd.DataFrame(classification_rep).transpose()
+
+
+    # Display accuracy and classification report
+    st.write(f"Accuracy: {accuracy:.2%}")
+    st.write("\nConfusion Matrix:")
+    st.write(conf_matrix)
+    # Display the classification report in Streamlit
+    st.write("### Classification Report:")
+    st.table(df_classification_rep)
+
+    # Set up the Streamlit app
+    st.title('Scatter Plot: Transaction Revenue vs Session Count')
+
+    # Create a figure and axes
+    fig, ax = plt.subplots(figsize=(10, 6))
 
     # Plot the scatter plot
-    plt.figure(figsize=(8, 6))
-    sns.scatterplot(x=X_test[selected_variable_1], y=y_test, hue=y_test, palette="viridis", s=80)
-    plt.title("Scatter Plot with Logistic Regression Line")
-    
-    # Plot the logistic regression line
-    x_values = np.linspace(X_test[selected_variable_1].min(), X_test[selected_variable_1].max(), 100)
-    y_values = logistic_model.predict_proba(x_values.reshape(-1, 1))[:, 1]
-    plt.plot(x_values, y_values, color='red', linewidth=3, label="Logistic Regression Line")
+    scatter_plot = sns.scatterplot(
+        x='transactionRevenue',
+        y='count_session',
+        hue='has_converted',
+        data=df1,
+        palette='viridis',  # You can change the color palette if needed
+        ax=ax
+    )
 
-    plt.xlabel(selected_variable_1)
-    plt.ylabel(selected_variable_2)
-    plt.legend()
-    st.pyplot()
+    # Set plot labels and title
+    plt.xlabel('Transaction Revenue')
+    plt.ylabel('Session Count')
+    plt.title('Scatter Plot: Transaction Revenue vs Session Count')
 
-    # Display Evaluation Metrics
-    st.write(f"**Precision:** {precision:.2f}")
-    st.write(f"**Recall:** {recall:.2f}")
-    st.write(f"**Accuracy:** {accuracy:.2f}")
-    st.write(f"**F1-Score:** {f1:.2f}")
-
-    # Display Confusion Matrix
-    st.write("**Confusion Matrix:**")
-    st.write(conf_matrix)
+    # Show the plot in Streamlit
+    st.pyplot(fig)
     
 elif selected_tab == "Random Forest Classifier":
-    # Allow users to select X and y variables
-    selected_variable_X_rf = st.selectbox("Select X Variable", df1.columns)
-    selected_variable_y_rf = st.selectbox("Select y Variable", df1.columns)
-
     # Features
-    X_rf = df1[[selected_variable_X_rf]]
+    X = df[['count_session', 'count_hit']]
+
     # Target variable
-    y_rf = df1[selected_variable_y_rf]
+    y = df['has_converted']
 
     # Split the data into training and testing sets
-    X_train_rf, X_test_rf, y_train_rf, y_test_rf = train_test_split(X_rf, y_rf, test_size=0.2, random_state=42)
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1000)
 
-    # Create and train the Random Forest Classifier model
-    rf_model = RandomForestClassifier(random_state=42)
-    rf_model.fit(X_train_rf, y_train_rf)
-
-    # Make predictions on the test set
-    y_pred_rf = rf_model.predict(X_test_rf)
+    # Define and train your RandomForestClassifier model
+    rf_model = RandomForestClassifier(random_state=1000, n_estimators=100, max_depth=None, min_samples_split=2, min_samples_leaf=1)
+    rf_model.fit(X_train, y_train)
+    st.title("Random Forest Classifier")
+    st.subheader("Random Forest Classifier Algorithm for analysing between count session and count hit has impact on conversion")
+    # Make predictions
+    y_pred = rf_model.predict(X_test)
 
     # Evaluate the model
-    accuracy_rf = accuracy_score(y_test_rf, y_pred_rf)
-    classification_rep_rf = classification_report(y_test_rf, y_pred_rf)
-    conf_matrix_rf = confusion_matrix(y_test_rf, y_pred_rf)
+    accuracy = accuracy_score(y_test, y_pred)
+    classification_rep = classification_report(y_test, y_pred, output_dict=True)
+    # Convert the classification report to a DataFrame
+    df_classification_rep = pd.DataFrame(classification_rep).transpose()
 
-    # Display results in Streamlit
-    st.header("Random Forest Classifier Model Evaluation")
+    # Display the evaluation results
+    st.write(f"Accuracy: {accuracy:.2f}")
+    # Display the classification report in Streamlit
+    st.write("### Classification Report:")
+    st.table(df_classification_rep)
 
-    # Display Evaluation Metrics
-    st.write(f"**Accuracy:** {accuracy_rf:.2f}")
+    # Display confusion matrix (optional)
+    st.write("Confusion Matrix:")
+    st.write(pd.crosstab(y_test, y_pred, rownames=['Actual'], colnames=['Predicted']))
 
-    # Display Classification Report
-    st.write("**Classification Report:**")
-    st.write(classification_rep_rf)
-    # Display Confusion Matrix
-    st.write("**Confusion Matrix:**")
-    # Display Confusion Matrix
-    st.write("**Confusion Matrix:**")
+    # Concatenate X_test and y_test
+    data = X_test.join(y_test, how='outer')
+    data.columns = ['count_session', 'count_hit', 'has_converted']
+
+    # Set up the Streamlit app
+    st.title('Scatter Plot: Session Count vs Hit Count')
+
+    # Add a scatter plot using Seaborn
     fig, ax = plt.subplots()
-    sns.heatmap(conf_matrix_rf, annot=True, cmap="Blues", fmt="d", cbar=False, ax=ax)
+    scatter_plot = sns.scatterplot(
+        x='count_session',
+        y='count_hit',
+        hue='has_converted',
+        data=data,
+        ax=ax
+    )
+
+    # Set plot labels and title
+    plt.xlabel('Session Count')
+    plt.ylabel('Hit Count')
+    plt.title('Scatter Plot: Session Count vs Hit Count')
+
+    # Show the plot
     st.pyplot(fig)
 
-    # Display Feature Importance
-    st.header("Feature Importance")
-    feature_importance = pd.Series(rf_model.feature_importances_, index=X_rf.columns)
-    feature_importance = feature_importance.sort_values(ascending=False)
+elif selected_tab == "Decision Tree Classifier":
+    # Set up the Streamlit app
+    st.title('Decision Tree Classifier')
+    st.subheader("Decision Tree Classifier for the analysis of Transaction revenue and count hit impact the conversion")
 
-    # Create and plot the bar chart
-    fig, ax = plt.subplots()
-    feature_importance.plot(kind='bar')
-    ax.set_title('Feature Importance')
-    ax.set_xlabel('Features')
-    ax.set_ylabel('Importance')
-    st.pyplot(fig)
+    # Features
+    X = df1[['transactionRevenue', 'count_hit']]
+
+    # Target variable
+    y = df1['has_converted']
+
+    # Split the data into training and testing sets
+    X_train, X_test, y_train, y_test = train_test_split(X, y, test_size=0.3, random_state=1000)
+
+    # Create and train the Decision Tree model
+    tree_model = DecisionTreeClassifier(random_state=1000)
+    tree_model.fit(X_train, y_train)
+
+    # Make predictions on the test set
+    y_pred = tree_model.predict(X_test)
+
+    # Evaluate the model
+    accuracy = accuracy_score(y_test, y_pred)
+    conf_matrix = confusion_matrix(y_test, y_pred)
+    classification_rep = classification_report(y_test, y_pred, output_dict=True)
+    # Convert the classification report to a DataFrame
+    df_classification_rep = pd.DataFrame(classification_rep).transpose()
+
+
+    # Display the evaluation results
+    st.write(f"Accuracy: {accuracy:.2%}")
+    st.write("Confusion Matrix:")
+    st.write(conf_matrix)
+    
+    # Display the classification report in a table
+    st.write("### Classification Report:")
+    st.table(df_classification_rep)
+
+    # Plot the decision tree
+    st.set_option('deprecation.showPyplotGlobalUse', False)  # Disable deprecated warning
+    plt.figure(figsize=(15, 10))
+    plot_tree(tree_model, filled=True, feature_names=X.columns, class_names=['Not Converted', 'Converted'])
+    st.pyplot()
+
+
